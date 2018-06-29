@@ -13,8 +13,3 @@ lazy val global = (project in file (".")).settings(
   )
 )
 
-lazy val ldfiakka = (project in file ("ldfi-akka"))
-.settings(
-	name := "ldfi-akka",
-	mainClass in Compile := Some("ldfi.akka.Main"))
-.dependsOn(global)
