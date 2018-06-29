@@ -1,5 +1,5 @@
 organization := "com.typesafe.akka.samples"
-name := "akka-sample-persistence-scala"
+name := "persistence"
 
 scalaVersion := "2.12.4"
 
@@ -12,3 +12,9 @@ lazy val global = (project in file (".")).settings(
     "org.fusesource.leveldbjni"   % "leveldbjni-all"   % "1.8"
   )
 )
+
+lazy val ldfiakka = (project in file ("ldfi-akka"))
+.settings(
+	name := "ldfi-akka",
+	mainClass in Compile := Some("ldfi.akka.Main"))
+.dependsOn(global)
