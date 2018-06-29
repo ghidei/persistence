@@ -94,7 +94,14 @@ object PersistentActorExample extends App {
   Await.ready(system.terminate(), 60.seconds)
 
 
+
   def verifyCorrectness(): Boolean = {
+    val (firstFour, _) = endState.splitAt(4)
+    val correctList = List("foo-", "foo-", "baz-", "baz-")
+    compareLists(firstFour.reverse, correctList, endState.length - 4)
+  }
+
+  def verifyCorrectnessOld(): Boolean = {
     val correctList = List("foo-", "foo-", "baz-", "baz-", "bar-", "bar-", "buzz-", "buzz-")
     initState match {
       case Nil => compareLists(endState.reverse, correctList, 0)
