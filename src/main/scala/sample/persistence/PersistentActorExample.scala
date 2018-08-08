@@ -3,19 +3,18 @@ package sample.persistence
 //#persistent-actor-example
 import akka.actor._
 import akka.persistence._
-import scala.concurrent.Await
-import scala.concurrent.duration._
 
+import scala.concurrent.Await
+import akka.pattern.ask
+import akka.util.Timeout
+
+import scala.concurrent.duration._
 
 case class Cmd(data: String)
 
 case class Evt(data: String)
 
-case object setEvents
-
-object globalEvents {
-  var events: List[String] = List.empty
-}
+case object getEvents
 
 case class ExampleState(events: List[String] = Nil) {
   def updated(evt: Evt): ExampleState = copy(evt.data :: events)
@@ -25,7 +24,7 @@ case class ExampleState(events: List[String] = Nil) {
   override def toString: String = events.reverse.toString
 }
 
-class ExamplePersistentActor extends PersistentActor with ActorLogging {
+class ExamplePersistentActor extends PersistentActor {
   override def persistenceId = "sample-id-1"
 
   var state = ExampleState()
@@ -39,7 +38,7 @@ class ExamplePersistentActor extends PersistentActor with ActorLogging {
     case SnapshotOffer(_, snapshot: ExampleState) => state = snapshot
   }
 
-  val receiveCommand: Receive =  {
+  val receiveCommand: Receive = {
     case Cmd(data) =>
       persist(Evt(s"${data}-${numEvents}"))(updateState)
       persist(Evt(s"${data}-${numEvents + 1}")) { event =>
@@ -48,7 +47,7 @@ class ExamplePersistentActor extends PersistentActor with ActorLogging {
       }
     case "snap" => saveSnapshot(state)
     case "print" => println(state)
-    case setEvents => globalEvents.events = state.events
+    case `getEvents` => sender() ! state.events
   }
 
 }
@@ -61,13 +60,10 @@ object PersistentActorExample extends App {
 
   val persistentActor = system.actorOf(Props[ExamplePersistentActor], "persistentActor-4-scala")
 
-  persistentActor ! setEvents
+  implicit val timeout = Timeout(30 seconds)
 
-  Thread.sleep(2000)
-
-  val initState = globalEvents.events
-
-  Thread.sleep(2000)
+  val initFuture = persistentActor ? getEvents
+  val initState = Await.result(initFuture, timeout.duration).asInstanceOf[List[String]]
 
   persistentActor ! Cmd("foo")
   persistentActor ! Cmd("baz")
@@ -75,15 +71,12 @@ object PersistentActorExample extends App {
   persistentActor ! "snap"
   persistentActor ! "print"
   persistentActor ! Cmd("buzz")
+  persistentActor ! "print"
 
-  Thread.sleep(5000)
+  Thread.sleep(10000)
 
-  persistentActor ! setEvents
-
-  Thread.sleep(2000)
-
-  val endState = globalEvents.events
-
+  val endStateFuture = persistentActor ? getEvents
+  val endState = Await.result(endStateFuture, timeout.duration).asInstanceOf[List[String]]
 
   println("initState: " + initState)
   println("endState: " + endState)
@@ -93,26 +86,16 @@ object PersistentActorExample extends App {
   Thread.sleep(3000)
   Await.ready(system.terminate(), 60.seconds)
 
-
-
   def verifyCorrectness(): Boolean = {
-    val (firstFour, _) = endState.splitAt(4)
-    val correctList = List("foo-", "foo-", "baz-", "baz-")
-    compareLists(firstFour.reverse, correctList, endState.length - 4)
-  }
-
-  def verifyCorrectnessOld(): Boolean = {
     val correctList = List("foo-", "foo-", "baz-", "baz-", "bar-", "bar-", "buzz-", "buzz-")
     initState match {
       case Nil => compareLists(endState.reverse, correctList, 0)
       case _ =>
         val groupedInitState = initState.grouped(8).toList.reverse
         val groupedEndState = endState.grouped(8).toList.reverse
-
         val isInitStateValid = verifyState(groupedInitState, correctList, 0)
         val isEndStateValid = verifyState(groupedEndState, correctList, 0)
-
-        isInitStateValid && isEndStateValid
+        isInitStateValid && isEndStateValid && endState.lengthCompare(initState.length + 8) == 0
     }
   }
 
