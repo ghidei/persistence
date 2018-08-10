@@ -71,7 +71,6 @@ object PersistentActorExample extends App {
   persistentActor ! "snap"
   persistentActor ! "print"
   persistentActor ! Cmd("buzz")
-  persistentActor ! "print"
 
   Thread.sleep(10000)
 
@@ -80,8 +79,7 @@ object PersistentActorExample extends App {
 
   println("initState: " + initState)
   println("endState: " + endState)
-
-  println(verifyCorrectness())
+  println("Correctness of run: " + verifyCorrectness())
 
   Thread.sleep(3000)
   Await.ready(system.terminate(), 60.seconds)
